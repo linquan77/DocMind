@@ -1,14 +1,14 @@
 from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, WebBaseLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
-from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from config import *
 
 def get_embeddings():
-    return OpenAIEmbeddings(
-        model="deepseek-embedding",
-        api_key=DEEPSEEK_API_KEY,
-        base_url=DEEPSEEK_BASE_URL
+    return HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True}
     )
 
 def load_file(file_path: str):

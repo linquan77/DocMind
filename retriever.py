@@ -1,12 +1,12 @@
 from langchain_community.vectorstores import Chroma
-from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from config import *
 
 def get_retriever():
-    embeddings = OpenAIEmbeddings(
-        model="deepseek-embedding",
-        api_key=DEEPSEEK_API_KEY,
-        base_url=DEEPSEEK_BASE_URL
+    embeddings = HuggingFaceEmbeddings(
+        model_name=EMBEDDING_MODEL,
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True}
     )
     vectorstore = Chroma(
         persist_directory=CHROMA_DB_PATH,
