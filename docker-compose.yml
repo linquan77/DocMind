@@ -8,4 +8,5 @@ services:
     volumes:
       - ./chroma_db:/app/chroma_db   # 向量库持久化
       - ./docs:/app/docs             # 文档目录
+      - .:/app      
     restart: unless-stopped

@@ -1,7 +1,7 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 from retriever import get_retriever
 from config import *
 
@@ -29,10 +29,14 @@ def get_qa_chain():
     prompt = PromptTemplate.from_template(PROMPT_TEMPLATE)
     retriever = get_retriever()
 
-    chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
+    # 同时返回答案和来源文档
+    chain = RunnableParallel(
+        answer=(
+            {"context": retriever | format_docs, "question": RunnablePassthrough()}
+            | prompt
+            | llm
+            | StrOutputParser()
+        ),
+        sources=retriever  # 单独保留原始文档对象
     )
     return chain

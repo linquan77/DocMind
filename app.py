@@ -36,18 +36,18 @@ if query := st.chat_input("请输入问题..."):
 
     with st.chat_message("assistant"):
         with st.spinner("检索中..."):
+            # 提问时才初始化，避免 chroma_db 不存在报错
             chain = get_qa_chain()
-            result = chain.invoke({"query": query})
-            answer = result["result"]
-            sources = result["source_documents"]
+            result = chain.invoke(query)
+            answer = result["answer"]
+            sources = result["sources"]
 
         st.write(answer)
 
-        # 显示来源
         if sources:
             with st.expander("📄 查看来源"):
                 for doc in sources:
-                    st.markdown(f"**{doc.metadata.get('source', '未知')}** "
+                    st.markdown(f"**{doc.metadata.get('source', '未知文件')}**  "
                                 f"第 {doc.metadata.get('page', '?')} 页")
                     st.caption(doc.page_content[:200] + "...")
 
