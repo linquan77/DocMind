@@ -1,0 +1,2 @@
+[server]
+maxUploadSize = 50    # 上传文件大小限制，单位 MB
