@@ -1,12 +1,18 @@
 services:
   rag-app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    pull_policy: never        # 不拉取新镜像，直接用本地缓存
     ports:
       - "8501:8501"
     env_file:
       - .env
     volumes:
-      - ./chroma_db:/app/chroma_db   # 向量库持久化
-      - ./docs:/app/docs             # 文档目录
-      - .:/app      
+      - ./chroma_db:/app/chroma_db
+      - ./docs:/app/docs
+      - ./models:/app/models
     restart: unless-stopped
+    environment:
+      - HF_ENDPOINT=https://hf-mirror.com
+      - HF_HOME=/app/models

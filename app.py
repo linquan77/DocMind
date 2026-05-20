@@ -25,8 +25,12 @@ with st.sidebar:
                     suffix=f".{f.name.split('.')[-1]}"
                 ) as tmp:
                     tmp.write(f.read())
-                    count = ingest(tmp.name)
-                    os.unlink(tmp.name)
+                    tmp_path = tmp.name
+                    
+                #传入原始文件名
+                count = ingest(tmp_path, original_name=f.name)
+                os.unlink(tmp_path)
+
                 if count == 0:
                     st.warning(f"{f.name} 已入库，跳过")
                 else:
