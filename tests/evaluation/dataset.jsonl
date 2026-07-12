@@ -1,0 +1,4 @@
+{"id":"price_001","question":"产品价格表里小苹果系列产品的单价是多少？","expected_sources":["产品价格表.xlsx","产品价格表.pdf"],"expected_keywords":["小苹果","元"],"should_refuse":false}
+{"id":"ai_001","question":"人工智能技术概览中如何描述机器学习？","expected_sources":["人工智能技术概览.pdf"],"expected_keywords":["机器学习"],"should_refuse":false}
+{"id":"ml_001","question":"机器学习与深度学习技术手册中提到的深度学习核心思想是什么？","expected_sources":["机器学习与深度学习技术手册.docx"],"expected_keywords":["深度学习"],"should_refuse":false}
+{"id":"refuse_001","question":"文档里有没有说明火星基地的住宿价格？","expected_sources":[],"expected_keywords":[],"should_refuse":true}

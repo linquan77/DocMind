@@ -73,6 +73,21 @@ with st.sidebar:
                     st.success("知识库已清空")
                     st.rerun()
 
+    st.divider()
+    all_docs = list_documents()
+    doc_options = [doc["source"] for doc in all_docs]
+    doc_labels = {
+        doc["source"]: f"{doc['filename']}（{doc['chunks']} 块）"
+        for doc in all_docs
+    }
+    selected_sources = st.multiselect(
+        "文档选择",
+        options=doc_options,
+        default=doc_options,
+        format_func=lambda source: doc_labels.get(source, source),
+        help="只在选中的文档中检索；全选等同于整个知识库。",
+    )
+
 
 # 主区域：问答
 st.header("💬 开始提问")
@@ -102,17 +117,30 @@ else:
     with st.chat_message("assistant"):
         with st.spinner("检索中..."):
             chain = get_qa_chain()
-            result = chain.invoke(query)
+            metadata_filter = None
+            if selected_sources and set(selected_sources) != set(doc_options):
+                metadata_filter = {"source": {"$in": selected_sources}}
+            result = chain.invoke({
+                "question": query,
+                "metadata_filter": metadata_filter,
+            })
             answer = result["answer"]
             sources = result["sources"]
 
         st.write(answer)
+        st.caption(
+            f"改写查询：{result.get('rewritten_query', query)} · "
+            f"平均/本次延迟统计字段：{result.get('latency_ms', 0)} ms"
+        )
 
         if sources:
             with st.expander("📄 查看来源"):
                 for doc in sources:
+                    citation_id = doc.metadata.get("citation_id", "?")
                     source = doc.metadata.get("source", "未知文件")
                     doc_type = doc.metadata.get("type", "")
+                    score = doc.metadata.get("score", 0)
+                    rank_reason = doc.metadata.get("rank_reason", "")
 
                     if doc_type in ["price_table", "price_summary"]:
                         row = doc.metadata.get("row", "?")
@@ -121,12 +149,11 @@ else:
                         page = doc.metadata.get("page", "?")
                         location = f"第 {page} 页"
 
-                    st.markdown(f"**{source}** · {location}")
+                    st.markdown(f"**[{citation_id}] {source}** · {location} · 相关度 {score:.3f}")
+                    st.caption(rank_reason)
                     st.caption(doc.page_content[:200] + "...")
 
     st.session_state.messages.append({"role": "assistant", "content": answer})
     st.session_state.is_thinking = False
     st.session_state.pending_query = None
     st.rerun()
-
-    st.session_state.messages.append({"role": "assistant", "content": answer})

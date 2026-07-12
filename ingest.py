@@ -132,6 +132,10 @@ def ingest(file_path: str, original_name: str = None, progress_callback=None):
         )
         chunks = splitter.split_documents(docs)
 
+    for idx, chunk in enumerate(chunks):
+        chunk.metadata["chunk_index"] = idx
+        chunk.metadata["chunk_total"] = len(chunks)
+
     # 4. 去重检查
     if progress_callback:
         progress_callback(0.5, "检查重复...")
