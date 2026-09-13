@@ -1,26 +1,30 @@
-import os
-from dotenv import load_dotenv
+"""Compatibility exports for first-stage scripts.
 
-load_dotenv()
+New application code reads settings from :mod:`app.core.config`.
+"""
 
-DEEPSEEK_API_KEY  = os.getenv("DEEPSEEK_API_KEY")
-DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL")
-DEEPSEEK_MODEL    = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
-EMBEDDING_MODEL   = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")
-CHROMA_DB_PATH    = os.getenv("CHROMA_DB_PATH", "./chroma_db")
-MODEL_CACHE_PATH  = os.getenv("MODEL_CACHE_PATH", "./models")
-CHUNK_SIZE        = int(os.getenv("CHUNK_SIZE", 500))
-CHUNK_OVERLAP     = int(os.getenv("CHUNK_OVERLAP", 50))
-TOP_K             = int(os.getenv("TOP_K", 4))
+from app.core.config import get_settings
 
-# 第一阶段 RAG 检索参数
-VECTOR_TOP_K      = int(os.getenv("VECTOR_TOP_K", 12))
-BM25_TOP_K        = int(os.getenv("BM25_TOP_K", 12))
-RERANKER_CANDIDATE_K = int(os.getenv("RERANKER_CANDIDATE_K", 20))
-RERANKER_SCORE_THRESHOLD = float(os.getenv("RERANKER_SCORE_THRESHOLD", 0.2))
-VECTOR_WEIGHT     = float(os.getenv("VECTOR_WEIGHT", 0.6))
-BM25_WEIGHT       = float(os.getenv("BM25_WEIGHT", 0.4))
-ENABLE_RERANKER   = os.getenv("ENABLE_RERANKER", "true").lower() == "true"
-RERANKER_MODEL    = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-base")
-RERANKER_WEIGHT   = float(os.getenv("RERANKER_WEIGHT", 0.7))
-ENABLE_QUERY_REWRITE = os.getenv("ENABLE_QUERY_REWRITE", "true").lower() == "true"
+
+_settings = get_settings()
+
+DEEPSEEK_API_KEY = _settings.deepseek_api_key
+DEEPSEEK_BASE_URL = _settings.deepseek_base_url
+DEEPSEEK_MODEL = _settings.deepseek_model
+EMBEDDING_MODEL = _settings.embedding_model
+CHROMA_DB_PATH = _settings.chroma_db_path
+MODEL_CACHE_PATH = _settings.model_cache_path
+CHUNK_SIZE = _settings.chunk_size
+CHUNK_OVERLAP = _settings.chunk_overlap
+TOP_K = _settings.top_k
+VECTOR_TOP_K = _settings.vector_top_k
+BM25_TOP_K = _settings.bm25_top_k
+RERANKER_CANDIDATE_K = _settings.reranker_candidate_k
+RERANKER_SCORE_THRESHOLD = _settings.reranker_score_threshold
+VECTOR_WEIGHT = _settings.vector_weight
+BM25_WEIGHT = _settings.bm25_weight
+ENABLE_RERANKER = _settings.enable_reranker
+RERANKER_MODEL = _settings.reranker_model
+RERANKER_WEIGHT = _settings.reranker_weight
+ENABLE_QUERY_REWRITE = _settings.enable_query_rewrite
+CONTEXT_MAX_TOKENS = _settings.context_max_tokens

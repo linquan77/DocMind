@@ -6,3 +6,5 @@ __pycache__/
 docs/*
 !docs/version_updates.md
 models/
+docmind.db
+docmind.db-*

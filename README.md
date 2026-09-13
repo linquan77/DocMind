@@ -4,7 +4,7 @@
 AI-powered document Q&A system based on RAG, LangChain & DeepSeek
 
 ## 功能
-- 支持 PDF、Word、网页文档解析
+- 支持 PDF、Word、Excel 和本地 HTML 文档解析
 - 支持 BM25 + 向量混合检索
 - 支持 Reranker 重排序、相似度阈值过滤
 - 支持 Metadata 过滤和前端文档选择
@@ -51,3 +51,76 @@ python tests/evaluation/evaluate_answer.py
 评测指标包括 `Recall@5`、`MRR`、答案正确率、引用正确率、拒答准确率和平均延迟。
 
 详细版本说明见 `docs/version_updates.md`。
+
+## 第二阶段：FastAPI 服务
+
+当前已加入 FastAPI 服务、文档管理、独立检索和问答接口。SQLite 保存文档元数据，Chroma 继续保存文档切块及向量。
+
+启动 API：
+
+```bash
+uvicorn app.main:app --reload
+```
+
+接口文档：`http://127.0.0.1:8000/docs`
+
+健康检查：
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+上传文档：
+
+```bash
+curl -X POST http://127.0.0.1:8000/documents \
+  -F "file=@docs/example.pdf"
+```
+
+第一版 HTML 支持本地 `.html` 和 `.htm` 文件，提取文件中已有的可见文本，不执行 JavaScript，也不会抓取链接页面：
+
+```bash
+curl -X POST http://127.0.0.1:8000/documents \
+  -F "file=@docs/example.html"
+```
+
+查看文档元数据：
+
+```bash
+curl http://127.0.0.1:8000/documents
+```
+
+删除文档：
+
+```bash
+curl -X DELETE http://127.0.0.1:8000/documents/{document_id}
+```
+
+独立检索（不会调用大模型）：
+
+```bash
+curl -X POST http://127.0.0.1:8000/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"文档讲了什么？","top_k":10}'
+```
+
+文档问答：
+
+```bash
+curl -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question":"文档讲了什么？","top_k":4}'
+```
+
+检索器也可以被未来的 Agent 直接调用：
+
+```python
+from app.rag.retriever import get_retriever
+
+retriever = get_retriever()
+results = retriever.search("文档讲了什么？", top_k=10)
+```
+
+每个检索结果保留来源、页码、向量分数、BM25 分数、Rerank 分数和排序说明。`/chat` 额外返回模型 token 用量、上下文估算 token 数及是否发生上下文截断。
+
+检索层已经预留服务端权限范围：用户选择的文档集合会与授权系统提供的文档集合取交集。当前版本尚未接入登录系统，因此默认授权依赖返回无限制；接入认证后只需替换 `app/core/security.py` 中的依赖。

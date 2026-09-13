@@ -1,11 +1,9 @@
-"""Compatibility exports for first-stage scripts."""
+"""Public RAG interfaces for the API and future agents."""
 
-from app.rag.embeddings import get_embeddings
 from app.rag.retriever import (
     HybridRetriever,
     RetrievalResult,
     RetrievalScope,
-    SimpleBM25,
     get_retriever,
 )
 
@@ -13,7 +11,5 @@ __all__ = [
     "HybridRetriever",
     "RetrievalResult",
     "RetrievalScope",
-    "SimpleBM25",
-    "get_embeddings",
     "get_retriever",
 ]

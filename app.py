@@ -14,8 +14,8 @@ with st.sidebar:
     # Tab1：上传
     with tab1:
         uploaded = st.file_uploader(
-            "支持 PDF / Word / Excel",
-            type=["pdf", "docx", "xlsx"],   # ← 加了 xlsx
+            "支持 PDF / Word / Excel / HTML",
+            type=["pdf", "docx", "xlsx", "html", "htm"],
             accept_multiple_files=True
         )
         if uploaded and st.button("解析入库", type="primary"):
