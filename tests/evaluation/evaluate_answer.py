@@ -42,12 +42,14 @@ def evaluate(dataset_path: Path):
     citation_correct = 0
     refusal_correct = 0
     latencies = []
+    total_tokens = []
 
     for row in rows:
         result = chain.invoke(row["question"])
         answer = result["answer"]
         sources = result.get("sources", [])
         latencies.append(result.get("latency_ms", 0))
+        total_tokens.append(result.get("token_usage", {}).get("total_tokens", 0))
 
         should_refuse = row.get("should_refuse", False)
         did_refuse = bool(result.get("refused")) or answer.strip().startswith(REFUSAL_TEXT)
@@ -79,6 +81,7 @@ def evaluate(dataset_path: Path):
             "rewritten_query": result.get("rewritten_query"),
             "latency_ms": result.get("latency_ms"),
             "refused": did_refuse,
+            "token_usage": result.get("token_usage", {}),
             "answer_correct": is_answer_correct,
             "citation_correct": is_citation_correct,
             "sources": [
@@ -96,6 +99,7 @@ def evaluate(dataset_path: Path):
         "citation_accuracy": citation_correct / total if total else 0,
         "refusal_accuracy": refusal_correct / total if total else 0,
         "average_latency_ms": sum(latencies) / total if total else 0,
+        "average_total_tokens": sum(total_tokens) / total if total else 0,
         "count": total,
     }
     print("\nMETRICS")

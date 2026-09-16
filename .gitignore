@@ -5,4 +5,8 @@ __pycache__/
 .DS_Store
 docs/*
 !docs/version_updates.md
-models/
+!docs/database-schema.md
+/models/
+docmind.db
+docmind.db-*
+data/raw/wiki/

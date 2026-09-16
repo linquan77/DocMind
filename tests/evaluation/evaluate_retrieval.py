@@ -34,7 +34,7 @@ def evaluate(dataset_path: Path, top_k: int):
 
     for row in rows:
         started = time.perf_counter()
-        results = retriever.retrieve(row["question"], top_k=top_k)
+        results = retriever.search(row["question"], top_k=top_k)
         latencies.append((time.perf_counter() - started) * 1000)
 
         expected_sources = row.get("expected_sources", [])
@@ -60,6 +60,9 @@ def evaluate(dataset_path: Path, top_k: int):
                 {
                     "source": item.doc.metadata.get("source"),
                     "score": round(item.score, 4),
+                    "vector_score": round(item.vector_score, 4),
+                    "bm25_score": round(item.bm25_score, 4),
+                    "rerank_score": round(item.rerank_score, 4) if item.rerank_score is not None else None,
                     "rank_reason": item.rank_reason,
                 }
                 for item in results
