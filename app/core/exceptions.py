@@ -28,6 +28,7 @@ class AppError(Exception):
 
 
 def _error_body(code: str, message: str, details: Any = None) -> dict[str, Any]:
+    # 对外错误统一携带机器可读 code 和 trace ID，同时避免暴露内部堆栈。
     body: dict[str, Any] = {
         "error": {
             "code": code,

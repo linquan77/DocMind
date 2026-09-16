@@ -55,6 +55,7 @@ def build_scope(
     selected_document_ids: list[str] | None = None,
     allowed_document_ids: set[str] | None = None,
 ) -> RetrievalScope | None:
+    # selected_document_ids 只是用户本次选择的范围；真正的权限边界由服务端allowed_document_ids 决定。检索器会在两者同时存在时取交集。
     if selected_document_ids is None and allowed_document_ids is None:
         return None
     return RetrievalScope(
@@ -68,6 +69,7 @@ def build_scope(
 
 
 def retrieval_result_to_dict(result: RetrievalResult) -> dict[str, Any]:
+    # 固定检索结果的对外结构，让 /search、/chat 和未来 Agent 工具都能稳定拿到来源、页码及各阶段分数，而不依赖内部 Document 实现。
     metadata = result.doc.metadata
     return {
         "citation_id": metadata.get("citation_id"),
@@ -95,6 +97,7 @@ class QAService:
         query_rewriter: QueryRewriter | None = None,
         answer_generator: AnswerGenerator | None = None,
     ) -> None:
+        # 依赖支持注入，便于测试时替换模型，也方便未来 Agent 直接复用检索模块。
         self.retriever = retriever or get_retriever()
         self.context_builder = context_builder or ContextBuilder()
         self.query_rewriter = query_rewriter or QueryRewriter()
@@ -109,6 +112,7 @@ class QAService:
         allowed_document_ids: set[str] | None = None,
         metadata_filter: MetadataFilter = None,
     ) -> SearchExecution:
+        # 搜索用例只执行独立检索链路，不调用大模型生成答案。
         started = time.perf_counter()
         scope = build_scope(
             selected_document_ids=selected_document_ids,
@@ -133,6 +137,7 @@ class QAService:
         allowed_document_ids: set[str] | None = None,
         metadata_filter: MetadataFilter = None,
     ) -> QAResult:
+        # 完整问答链路：查询改写 → 独立检索 → 证据判断 → 上下文构造 → 答案生成。
         started = time.perf_counter()
         rewrite = self.query_rewriter.rewrite(question)
         search = self.search(
@@ -143,6 +148,7 @@ class QAService:
             metadata_filter=metadata_filter,
         )
         if not search.results:
+            # 没有可信证据时直接拒答，避免模型脱离文档自由发挥。
             latency_ms = int((time.perf_counter() - started) * 1000)
             logger.info("answer refused reason=no_evidence latency_ms=%d", latency_ms)
             return QAResult(
@@ -157,6 +163,7 @@ class QAService:
                 context_truncated=False,
             )
 
+        # 上下文构造阶段统一分配引用编号并控制 token 预算。
         context = self.context_builder.build(search.results)
         generation = self.answer_generator.generate(question, context.text)
         latency_ms = int((time.perf_counter() - started) * 1000)

@@ -14,6 +14,10 @@ from pydantic import BaseModel, Field
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
 
 class Settings(BaseModel):
@@ -23,7 +27,27 @@ class Settings(BaseModel):
     app_version: str = Field(default="0.2.0")
     environment: str = Field(default="development")
     log_level: str = Field(default="INFO")
+    cors_origins: list[str] = Field(default_factory=lambda: DEFAULT_CORS_ORIGINS.copy())
     database_url: str = Field(default="sqlite:///./docmind.db")
+    mediawiki_api_url: str = "https://oxygennotincluded.wiki.gg/zh/api.php"
+    mediawiki_base_url: str = "https://oxygennotincluded.wiki.gg/zh"
+    mediawiki_language: str = "zh"
+    mediawiki_root_categories: list[str] = Field(default_factory=lambda: ["建筑", "小动物"])
+    mediawiki_excluded_category_keywords: list[str] = Field(
+        default_factory=lambda: [
+            "调试",
+            "未实装",
+            "未使用",
+            "已移除",
+            "开发者",
+            "Debug",
+            "Unused",
+            "Unimplemented",
+        ]
+    )
+    mediawiki_snapshot_path: str = "./data/raw/wiki"
+    mediawiki_request_timeout: float = 30.0
+    mediawiki_user_agent: str = "Docmind/0.2 (non-commercial learning project)"
     deepseek_api_key: str | None = None
     deepseek_base_url: str | None = None
     deepseek_model: str = "deepseek-v4-pro"
@@ -47,12 +71,13 @@ class Settings(BaseModel):
 
 
 def _load_values() -> dict[str, str]:
+    # 先读取项目 .env，再用进程环境变量覆盖，满足容器和 CI 的注入需求。
     values = {
         key: value
         for key, value in dotenv_values(PROJECT_ROOT / ".env").items()
         if value is not None
     }
-    # Process variables intentionally win over values from .env.
+    # 进程环境变量优先级更高，生产环境无需修改仓库中的配置文件。
     import os
 
     for key in (
@@ -60,7 +85,16 @@ def _load_values() -> dict[str, str]:
         "APP_VERSION",
         "ENVIRONMENT",
         "LOG_LEVEL",
+        "CORS_ORIGINS",
         "DATABASE_URL",
+        "MEDIAWIKI_API_URL",
+        "MEDIAWIKI_BASE_URL",
+        "MEDIAWIKI_LANGUAGE",
+        "MEDIAWIKI_ROOT_CATEGORIES",
+        "MEDIAWIKI_EXCLUDED_CATEGORY_KEYWORDS",
+        "MEDIAWIKI_SNAPSHOT_PATH",
+        "MEDIAWIKI_REQUEST_TIMEOUT",
+        "MEDIAWIKI_USER_AGENT",
         "DEEPSEEK_API_KEY",
         "DEEPSEEK_BASE_URL",
         "DEEPSEEK_MODEL",
@@ -89,17 +123,43 @@ def _load_values() -> dict[str, str]:
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    # 配置在进程内只解析一次；测试需要切换环境时可显式 cache_clear()。
     values = _load_values()
 
     def as_bool(key: str, default: bool) -> bool:
         return values.get(key, str(default)).lower() == "true"
+
+    def as_csv(key: str, default: list[str]) -> list[str]:
+        # 用逗号分隔环境变量，便于不同部署环境配置多个可信前端域名。
+        raw_value = values.get(key)
+        if raw_value is None:
+            return default.copy()
+        return [item.strip() for item in raw_value.split(",") if item.strip()]
 
     return Settings(
         app_name=values.get("APP_NAME", "Docmind API"),
         app_version=values.get("APP_VERSION", "0.2.0"),
         environment=values.get("ENVIRONMENT", "development"),
         log_level=values.get("LOG_LEVEL", "INFO"),
+        cors_origins=as_csv("CORS_ORIGINS", DEFAULT_CORS_ORIGINS),
         database_url=values.get("DATABASE_URL", "sqlite:///./docmind.db"),
+        mediawiki_api_url=values.get(
+            "MEDIAWIKI_API_URL", "https://oxygennotincluded.wiki.gg/zh/api.php"
+        ),
+        mediawiki_base_url=values.get(
+            "MEDIAWIKI_BASE_URL", "https://oxygennotincluded.wiki.gg/zh"
+        ),
+        mediawiki_language=values.get("MEDIAWIKI_LANGUAGE", "zh"),
+        mediawiki_root_categories=as_csv("MEDIAWIKI_ROOT_CATEGORIES", ["建筑", "小动物"]),
+        mediawiki_excluded_category_keywords=as_csv(
+            "MEDIAWIKI_EXCLUDED_CATEGORY_KEYWORDS",
+            ["调试", "未实装", "未使用", "已移除", "开发者", "Debug", "Unused", "Unimplemented"],
+        ),
+        mediawiki_snapshot_path=values.get("MEDIAWIKI_SNAPSHOT_PATH", "./data/raw/wiki"),
+        mediawiki_request_timeout=float(values.get("MEDIAWIKI_REQUEST_TIMEOUT", 30)),
+        mediawiki_user_agent=values.get(
+            "MEDIAWIKI_USER_AGENT", "Docmind/0.2 (non-commercial learning project)"
+        ),
         deepseek_api_key=values.get("DEEPSEEK_API_KEY"),
         deepseek_base_url=values.get("DEEPSEEK_BASE_URL"),
         deepseek_model=values.get("DEEPSEEK_MODEL", "deepseek-v4-pro"),

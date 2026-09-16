@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 def create_document_record(
     *, filename: str, content_type: str | None, size_bytes: int
 ) -> DocumentRecord:
+    # 先登记 processing 状态，使上传后的处理进度可查询；向量写入成功后再改为 ready。
     document = DocumentRecord(
         id=str(uuid4()),
         filename=filename,
@@ -91,13 +92,16 @@ def delete_document_by_id(document_id: str) -> DocumentDeleteResult:
                 code="document_not_found",
             )
         filename = document.filename
+        # 先标记 deleting，避免删除期间仍被当作可用文档展示或检索。
         document.status = "deleting"
         document.error_message = None
         session.commit()
 
     try:
+        # 先删除 Chroma 切块；若失败，SQLite 元数据仍在，便于恢复和重试。
         deleted_chunks = delete_document_chunks(document_id)
     except Exception as exc:
+        # SQLite 与 Chroma 无法共享事务，因此通过恢复状态做补偿。
         logger.exception("failed to delete Chroma chunks for document %s", document_id)
         update_document(
             document_id,
@@ -112,6 +116,7 @@ def delete_document_by_id(document_id: str) -> DocumentDeleteResult:
         ) from exc
 
     with get_session_factory()() as session:
+        # 只有向量数据删除成功后才移除元数据，避免留下无法定位的孤儿向量。
         document = session.get(DocumentRecord, document_id)
         if document is not None:
             session.delete(document)
@@ -127,6 +132,7 @@ def delete_document_by_id(document_id: str) -> DocumentDeleteResult:
 def ingest_document(document: DocumentRecord, temp_path: Path) -> DocumentRecord:
     """Run the existing synchronous RAG ingestion outside the event loop."""
 
+    # 解析、模型推理和向量写入都是同步耗时操作，API 层会在线程池中调用本函数。
     chunk_count = ingest(
         str(temp_path),
         original_name=document.filename,

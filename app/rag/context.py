@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 def estimate_tokens(text: str) -> int:
     """Return a deterministic approximation when the model tokenizer is unavailable."""
 
+    # 不绑定特定模型 tokenizer，按中文字符、英文词和符号估算，结果用于上下文预算而非计费。
     units = re.findall(r"[\u4e00-\u9fff]|[a-zA-Z0-9_]+|[^\s]", text or "")
     return len(units)
 
@@ -54,6 +55,7 @@ class ContextBuilder:
         truncated = False
 
         for citation_id, result in enumerate(results, start=1):
+            # 检索顺序直接映射为引用编号，保证提示词、回答和响应来源使用同一编号。
             metadata = result.doc.metadata
             block = (
                 f"[{citation_id}] 来源：{metadata.get('source', '未知文件')}，"
@@ -62,9 +64,11 @@ class ContextBuilder:
             )
             block_tokens = estimate_tokens(block)
             if blocks and token_count + block_tokens > self.max_tokens:
+                # 保留完整切块，不在句子中间硬截断；剩余候选通过 truncated 标记体现。
                 truncated = True
                 break
 
+            # 将各阶段分数写回来源元数据，兼容旧 Streamlit 展示并便于 Agent 调试。
             metadata["citation_id"] = citation_id
             metadata["score"] = result.score
             metadata["vector_score"] = result.vector_score

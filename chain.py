@@ -1,5 +1,7 @@
 """Compatibility wrapper for Streamlit and first-stage evaluations."""
 
+# 新代码应优先调用 app.rag 与 app.services；此处保留旧入口以便 Streamlit 平滑迁移。
+
 from typing import Any
 
 from app.rag.context import ContextBuilder

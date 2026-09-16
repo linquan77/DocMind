@@ -82,6 +82,7 @@ class GenerationResult:
 
 def _create_llm() -> ChatOpenAI:
     settings = get_settings()
+    # 当前接口返回完整 JSON，因此使用非流式调用；未来流式接口可复用相同提示词和统计结构。
     return ChatOpenAI(
         model=settings.deepseek_model,
         api_key=settings.deepseek_api_key,
@@ -91,6 +92,7 @@ def _create_llm() -> ChatOpenAI:
 
 
 def _message_text(message: BaseMessage) -> str:
+    # 兼容模型返回纯字符串或内容块列表两种消息格式。
     content = message.content
     if isinstance(content, str):
         return content.strip()
@@ -104,6 +106,7 @@ def _message_text(message: BaseMessage) -> str:
 
 
 def _token_usage(message: BaseMessage) -> TokenUsage:
+    # 优先读取 LangChain 标准 usage_metadata，再兼容 OpenAI 风格 response_metadata。
     usage = getattr(message, "usage_metadata", None) or {}
     if usage:
         input_tokens = int(usage.get("input_tokens", 0))
@@ -129,6 +132,7 @@ class QueryRewriter:
 
         started = time.perf_counter()
         try:
+            # 改写失败时回退原问题，检索仍可继续，避免非关键增强能力拖垮主链路。
             message = _create_llm().invoke(REWRITE_PROMPT.format(question=question))
             rewritten = _message_text(message) or question
             usage = _token_usage(message)
@@ -148,6 +152,7 @@ class QueryRewriter:
 class AnswerGenerator:
     def generate(self, question: str, context: str) -> GenerationResult:
         started = time.perf_counter()
+        # 生成器只接收已经编号的证据，不直接访问向量库，保持模块边界清晰。
         message = _create_llm().invoke(ANSWER_PROMPT.format(context=context, question=question))
         answer = _message_text(message)
         usage = _token_usage(message)

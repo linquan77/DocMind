@@ -24,11 +24,13 @@ from app.services.document_service import (
 
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+# 第一版只允许可控的本地文件类型，避免把任意上传内容交给解析器。
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".xls", ".html", ".htm"}
 
 
 @router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED, summary="上传并入库文档")
 async def upload_document(file: UploadFile = File(...)) -> DocumentResponse:
+    # Path.name 会去掉客户端可能携带的目录，防止文件名影响服务端临时路径。
     filename = Path(file.filename or "").name
     suffix = Path(filename).suffix.lower()
     if not filename or suffix not in SUPPORTED_EXTENSIONS:
@@ -38,6 +40,7 @@ async def upload_document(file: UploadFile = File(...)) -> DocumentResponse:
             code="unsupported_document_type",
         )
 
+    # SQLite 和后续 RAG 入库都是同步操作，放入工作线程，避免阻塞 FastAPI 事件循环。
     if await asyncio.to_thread(document_filename_exists, filename):
         raise AppError(
             f"文档已存在：{filename}",
@@ -58,6 +61,7 @@ async def upload_document(file: UploadFile = File(...)) -> DocumentResponse:
 
     temp_path: Path | None = None
     try:
+        # 保留扩展名，文档加载器依赖后缀判断具体解析方式。
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
             temp_path = Path(temp_file.name)
         await asyncio.to_thread(temp_path.write_bytes, content)
@@ -78,6 +82,7 @@ async def upload_document(file: UploadFile = File(...)) -> DocumentResponse:
             code="document_ingestion_failed",
         ) from exc
     finally:
+        # 无论解析成功还是失败都清理临时文件，原始文件不会长期保存在本机。
         if temp_path is not None:
             temp_path.unlink(missing_ok=True)
         await file.close()
@@ -103,6 +108,7 @@ async def get_documents(
     summary="删除文档及其向量切块",
 )
 async def delete_document(document_id: str) -> DocumentDeleteResponse:
+    # 删除顺序和失败补偿由 Service 层负责，API 层只转换请求与响应。
     result = await asyncio.to_thread(delete_document_by_id, document_id)
     return DocumentDeleteResponse(
         id=result.id,

@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 def load_excel(file_path: str) -> list[Document]:
     """Convert spreadsheet rows into short natural-language documents."""
 
+    # data_only=True 读取公式计算结果；read_only=True 避免大表构建完整工作簿对象。
     workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
     try:
         worksheet = workbook.active
@@ -27,6 +28,7 @@ def load_excel(file_path: str) -> list[Document]:
         return []
 
     headers = [str(value).strip() if value is not None else "" for value in rows[0]]
+    # 优先按中文表头识别字段，识别失败时兼容第一阶段约定的第 2、3 列。
     name_column = next(
         (index for index, header in enumerate(headers) if any(key in header for key in ("名称", "商品", "品名"))),
         1,
@@ -64,6 +66,7 @@ def load_excel(file_path: str) -> list[Document]:
             text = f"{item_name}的单价是{price_text}元。"
 
         item_names.append(item_name)
+        # 每一行作为独立语义单元，保留原始行号，回答价格问题时可精确引用。
         documents.append(
             Document(
                 page_content=text,
@@ -93,7 +96,9 @@ def load_html(file_path: str) -> list[Document]:
     """
 
     path = Path(file_path)
+    # 直接传入字节，让 BeautifulSoup 根据 HTML 声明推断编码，兼容常见中文页面。
     soup = BeautifulSoup(path.read_bytes(), "html.parser")
+    # 脚本、样式和模板不是用户可见正文，写入向量库会制造检索噪声。
     for element in soup(["script", "style", "noscript", "template"]):
         element.decompose()
 
@@ -111,6 +116,7 @@ def load_html(file_path: str) -> list[Document]:
 
 def load_file(file_path: str) -> list[Document]:
     started = time.perf_counter()
+    # FastAPI 当前只开放本地上传；URL 分支仅用于兼容第一阶段已有调用。
     if file_path.startswith(("http://", "https://")):
         documents = WebBaseLoader(file_path).load()
         source_type = "web"

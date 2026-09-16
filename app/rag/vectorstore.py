@@ -15,10 +15,12 @@ logger = logging.getLogger(__name__)
 def get_chroma_client():
     """Create a client without loading the embedding model."""
 
+    # 删除和元数据查询不需要计算向量，原生客户端可避免加载 Embedding 模型。
     return chromadb.PersistentClient(path=get_settings().chroma_db_path)
 
 
 def get_vectorstore() -> Chroma:
+    # 只有相似度检索和新增切块需要绑定 Embedding 函数。
     return Chroma(
         persist_directory=get_settings().chroma_db_path,
         embedding_function=get_embeddings(),
@@ -47,6 +49,7 @@ def delete_document_chunks(document_id: str) -> int:
     """
 
     client = get_chroma_client()
+    # 遍历集合可兼容后续按租户或知识库拆分 Collection 的部署方式。
     deleted_count = 0
     for collection in client.list_collections():
         result = collection.get(where={"document_id": document_id}, include=["metadatas"])

@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 class CrossEncoderReranker:
     def __init__(self) -> None:
         settings = get_settings()
+        # 延迟导入重模型依赖，使健康检查和普通管理接口无需加载模型。
         from sentence_transformers import CrossEncoder
 
         started = time.perf_counter()
@@ -42,6 +43,7 @@ class CrossEncoderReranker:
 
 @lru_cache(maxsize=1)
 def get_reranker() -> CrossEncoderReranker | None:
+    # Reranker 是可选增强项；关闭或加载失败时继续使用向量+BM25结果，不中断服务。
     if not get_settings().enable_reranker:
         return None
     try:

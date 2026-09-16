@@ -38,6 +38,8 @@ async def search(
     allowed_document_ids: Annotated[set[str] | None, Depends(get_allowed_document_ids)],
 ) -> SearchResponse:
     try:
+        # allowed_document_ids 来自可信的服务端权限依赖，并非客户端请求体。
+        # 同步的向量检索在线程中执行，使异步 API 仍能并发处理其他请求。
         execution = await asyncio.to_thread(
             search_documents,
             request.query,
@@ -71,6 +73,7 @@ async def chat(
     allowed_document_ids: Annotated[set[str] | None, Depends(get_allowed_document_ids)],
 ) -> ChatResponse:
     try:
+        # 问答包含查询改写、检索、重排和模型调用，统一交给 QA Service 编排。
         result = await asyncio.to_thread(
             answer_question,
             request.question,
@@ -88,6 +91,7 @@ async def chat(
             code="chat_generation_failed",
         ) from exc
 
+    # 同时返回模型实际 token 用量和上下文估算值，便于后续 Agent 调试成本与截断问题。
     usage = result.token_usage
     return ChatResponse(
         answer=result.answer,

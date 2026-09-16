@@ -21,22 +21,26 @@ def ingest(
 ) -> int:
     started = time.perf_counter()
     logger.info("document ingestion started source=%s", original_name or file_path)
+    # 第一步：将不同格式统一转换为 LangChain Document。
     if progress_callback:
         progress_callback(0.1, "加载文件...")
     documents = load_file(file_path)
     logger.info("document loaded units=%d", len(documents))
 
+    # 第二步：补充跨数据库关联字段；document_id 用于 SQLite 与 Chroma 的一致删除。
     source = original_name or file_path
     for document in documents:
         document.metadata["source"] = source
         if document_id:
             document.metadata["document_id"] = document_id
 
+    # 第三步：根据文档类型应用切块策略，并保留来源元数据。
     if progress_callback:
         progress_callback(0.3, "分割内容...")
     chunks = split_documents(documents, file_path)
     logger.info("document split chunks=%d", len(chunks))
 
+    # 第四步：先去重再写入向量，避免重复文档污染召回结果。
     if progress_callback:
         progress_callback(0.5, "检查重复...")
     if document_chunks_exist(document_id=document_id, source=source):

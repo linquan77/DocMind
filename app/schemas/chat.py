@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class RetrievalRequest(BaseModel):
+    # 文档列表仅用于缩小本次检索范围，不是权限凭证；服务端仍会套用授权范围。
     document_ids: list[str] | None = Field(default=None, min_length=1, max_length=100)
     top_k: int = Field(default=4, ge=1, le=20)
 
@@ -57,6 +58,7 @@ class RetrievalHit(BaseModel):
 
 
 class TokenUsageResponse(BaseModel):
+    # 分开记录查询改写和答案生成，方便定位 token 成本来自哪一步。
     input_tokens: int = Field(ge=0)
     output_tokens: int = Field(ge=0)
     total_tokens: int = Field(ge=0)

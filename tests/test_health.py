@@ -22,3 +22,17 @@ def test_health_preserves_incoming_trace_id():
     assert response.status_code == 200
     assert response.headers["X-Trace-ID"] == "trace-test-001"
     assert response.json()["trace_id"] == "trace-test-001"
+
+
+def test_cors_allows_local_frontend_preflight():
+    response = client.options(
+        "/health",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["Access-Control-Allow-Origin"] == "http://localhost:5173"
+    assert response.headers["Access-Control-Allow-Credentials"] == "true"

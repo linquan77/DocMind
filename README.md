@@ -124,3 +124,34 @@ results = retriever.search("文档讲了什么？", top_k=10)
 每个检索结果保留来源、页码、向量分数、BM25 分数、Rerank 分数和排序说明。`/chat` 额外返回模型 token 用量、上下文估算 token 数及是否发生上下文截断。
 
 检索层已经预留服务端权限范围：用户选择的文档集合会与授权系统提供的文档集合取交集。当前版本尚未接入登录系统，因此默认授权依赖返回无限制；接入认证后只需替换 `app/core/security.py` 中的依赖。
+
+## 缺氧中文 Wiki 增量同步
+
+先升级数据库：
+
+```bash
+python -m alembic upgrade head
+```
+
+只读取远端分类和修订信息、查看同步计划，不写数据库和文件：
+
+```bash
+python -m app.commands.sync_wiki --dry-run
+```
+
+需要查看每个页面的计划时加入 `--verbose`。确认计划后，执行正式快照同步：
+
+```bash
+python -m app.commands.sync_wiki
+```
+
+正式同步只保存 SQLite 元数据和 `data/raw/wiki/{page_id}/{revision_id}.json` 原始快照，并将文档标记为 `pending_index`；当前阶段不会解析页面或写入 Chroma。
+
+开发阶段可以用可重复的 `--title` 参数只验证少量页面：
+
+```bash
+python -m app.commands.sync_wiki --dry-run --verbose --title "电解器" --title "人力发电机" --title "好吃哈奇"
+python -m app.commands.sync_wiki --title "电解器" --title "人力发电机" --title "好吃哈奇"
+```
+
+指定 `--title` 时属于部分同步：页面必须位于允许的“建筑/小动物”分类范围内，并且不会把未指定页面误判为下线。只有不指定标题的完整同步才会检测远端已删除页面并更新数据源的完整同步时间。

@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RetrievalResult:
+    # score 是最终排序分；其余分数字段保留各阶段结果，便于评测和定位排序问题。
     doc: Document
     score: float
     vector_score: float = 0.0
@@ -41,6 +42,7 @@ class RetrievalScope:
     allowed_document_ids: frozenset[str] | None = None
 
     def effective_document_ids(self) -> frozenset[str] | None:
+        # 用户选择不能扩大权限，只能在服务端授权集合中继续缩小检索范围。
         if self.selected_document_ids is None:
             return self.allowed_document_ids
         if self.allowed_document_ids is None:
@@ -49,6 +51,7 @@ class RetrievalScope:
 
 
 def _tokenize(text: str) -> list[str]:
+    # 无需额外中文分词依赖：英文按词、中文按单字和双字组合，满足轻量 BM25 基线。
     text = (text or "").lower()
     english_or_number = re.findall(r"[a-z0-9]+", text)
     chinese_chars = re.findall(r"[\u4e00-\u9fff]", text)
@@ -81,6 +84,7 @@ def _build_chroma_filter(metadata_filter: MetadataFilter) -> MetadataFilter:
 
 
 def _normalize_scores(items: Iterable[tuple[str, float]]) -> dict[str, float]:
+    # 向量分数、BM25 分数和 Rerank 分数量纲不同，融合前统一缩放到 0~1。
     entries = list(items)
     if not entries:
         return {}
@@ -152,6 +156,7 @@ class HybridRetriever:
         if requested_top_k < 1:
             raise ValueError("top_k must be at least 1")
         if scope is not None:
+            # 权限交集必须在向量检索和 BM25 检索之前应用，防止未授权切块进入候选集。
             effective_ids = scope.effective_document_ids()
             if effective_ids is not None and not effective_ids:
                 logger.info("retrieval denied by empty permission intersection")
@@ -175,6 +180,7 @@ class HybridRetriever:
             requested_top_k,
             bool(metadata_filter),
         )
+        # BM25 需要可访问语料的全文；这里先按权限过滤，再构建本次查询的临时索引。
         all_documents = self._load_all_documents(metadata_filter)
         if not all_documents:
             logger.info("retrieval completed results=0 reason=no_accessible_documents")
@@ -208,6 +214,7 @@ class HybridRetriever:
     ) -> list[RetrievalResult]:
         """Backward-compatible alias used by first-stage evaluations."""
 
+        # 保留旧方法名，第一阶段评测和 Streamlit 无需同时重写。
         return self.search(query, top_k=top_k, metadata_filter=metadata_filter)
 
     def _load_all_documents(self, metadata_filter: MetadataFilter) -> dict[str, Document]:
@@ -236,6 +243,7 @@ class HybridRetriever:
                 filter=_build_chroma_filter(metadata_filter),
             )
         except TypeError:
+            # 兼容旧版 Chroma；即使服务端过滤参数不可用，返回结果仍会在本地再次验权。
             logger.warning("vector store filter API unavailable; applying filter after retrieval")
             hits = self.vectorstore.similarity_search_with_score(
                 query, k=self.settings.vector_top_k
@@ -247,6 +255,7 @@ class HybridRetriever:
                 continue
             chunk_id = document.metadata.get("_chunk_id") or self._find_chunk_id(document)
             if chunk_id:
+                # Chroma 返回距离值，转换为越大越相似的分数，方便与 BM25 融合。
                 similarity = 1 / (1 + max(float(distance), 0.0))
                 scored.append((chunk_id, similarity))
         return scored
@@ -287,6 +296,7 @@ class HybridRetriever:
         for chunk_id in candidate_ids:
             vector_score = vector_scores.get(chunk_id, 0.0)
             bm25_score = bm25_scores.get(chunk_id, 0.0)
+            # 第一阶段沿用线性加权融合，权重通过环境变量调节并由评测集验证。
             combined_score = (
                 self.settings.vector_weight * vector_score
                 + self.settings.bm25_weight * bm25_score
@@ -314,6 +324,7 @@ class HybridRetriever:
         raw_scores = reranker.predict(
             query, [candidate.doc.page_content for candidate in candidates]
         )
+        # CrossEncoder 原始分数先归一化，再与召回阶段分数融合，保留两阶段信号。
         normalized = _normalize_scores(
             (str(index), score) for index, score in enumerate(raw_scores)
         )
