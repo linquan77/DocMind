@@ -26,7 +26,7 @@ SQLite 是文档目录信息的来源，Chroma 中的切块通过 `document_id` 
 | `filename` | `VARCHAR(512)` | 否 | 上传时的原始文件名 |
 | `content_type` | `VARCHAR(255)` | 是 | 文件 MIME 类型 |
 | `size_bytes` | `INTEGER` | 否 | 原始文件字节数 |
-| `status` | `VARCHAR(32)` | 否 | 生命周期状态，当前使用 `processing`、`ready`、`failed`、`deleting` |
+| `status` | `VARCHAR(32)` | 否 | 生命周期状态，当前使用 `processing`、`pending_index`、`indexing`、`ready`、`failed`、`index_failed`、`deleting`、`source_removed` |
 | `chunk_count` | `INTEGER` | 否 | 成功写入 Chroma 的切块数量 |
 | `error_message` | `TEXT` | 是 | 文档处理或删除失败时的说明 |
 | `created_at` | `DATETIME` | 否 | 创建时间，按 UTC 写入 |
