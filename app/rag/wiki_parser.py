@@ -83,14 +83,25 @@ def _clean_heading(value: str) -> str:
     return _clean_text(value)
 
 
+def _inside_nested_infobox_group(element: Tag, container: Tag) -> bool:
+    """Return whether an infobox field belongs to a child semantic group."""
+
+    parent_group = element.find_parent("section", class_="pi-group")
+    return parent_group is not None and parent_group is not container
+
+
 def _extract_infobox_lines(container: Tag) -> list[str]:
     lines: list[str] = []
     for caption in container.select(".pi-caption"):
+        if _inside_nested_infobox_group(caption, container):
+            continue
         text = _clean_text(caption.get_text(" ", strip=True))
         if text:
             lines.append(f"说明：{text}")
 
     for item in container.select(".pi-data"):
+        if _inside_nested_infobox_group(item, container):
+            continue
         label_tag = item.select_one(".pi-data-label")
         value_tag = item.select_one(".pi-data-value")
         label = _clean_text(label_tag.get_text(" ", strip=True)) if label_tag else ""
@@ -102,6 +113,8 @@ def _extract_infobox_lines(container: Tag) -> list[str]:
 
     # Some older Wiki skins use a classic table instead of a portable infobox.
     for row in container.select("tr"):
+        if _inside_nested_infobox_group(row, container):
+            continue
         cells = [_clean_text(cell.get_text(" ", strip=True)) for cell in row.find_all(["th", "td"])]
         cells = [cell for cell in cells if cell]
         if len(cells) >= 2:
@@ -110,6 +123,57 @@ def _extract_infobox_lines(container: Tag) -> list[str]:
             lines.append(cells[0])
 
     return list(dict.fromkeys(lines))
+
+
+def _extract_portable_infobox_sections(
+    container: Tag,
+    heading_path: tuple[str, ...],
+) -> list[WikiSection]:
+    """Keep portable-infobox group headers as retrievable section context.
+
+    A long group such as ``食谱`` may be split into several chunks. Making the
+    group a separate WikiSection ensures the splitter repeats that title in
+    every resulting chunk instead of leaving it only at the start of a large
+    flattened infobox.
+    """
+
+    base_lines = _extract_infobox_lines(container)
+    grouped_sections: list[WikiSection] = []
+    for group in container.select("section.pi-group"):
+        # Nested groups are handled by their nearest top-level group so fields
+        # are not emitted more than once.
+        if group.find_parent("section", class_="pi-group") is not None:
+            continue
+        header = group.find(class_="pi-header", recursive=False)
+        group_title = (
+            _clean_heading(header.get_text(" ", strip=True)) if header else ""
+        )
+        lines = _extract_infobox_lines(group)
+        if not lines:
+            continue
+        if not group_title:
+            # Headerless groups still belong to the variant-level information.
+            base_lines.extend(lines)
+            continue
+        grouped_sections.append(
+            WikiSection(
+                heading_path=(*heading_path, group_title),
+                content="\n".join(lines),
+                section_type="infobox",
+            )
+        )
+
+    sections: list[WikiSection] = []
+    if base_lines:
+        sections.append(
+            WikiSection(
+                heading_path=heading_path,
+                content="\n".join(list(dict.fromkeys(base_lines))),
+                section_type="infobox",
+            )
+        )
+    sections.extend(grouped_sections)
+    return sections
 
 
 def _extract_infobox_sections(root: Tag) -> list[WikiSection]:
@@ -129,25 +193,19 @@ def _extract_infobox_sections(root: Tag) -> list[WikiSection]:
                 for content in tab_contents:
                     ref = str(content.get("data-ref"))
                     variant = tabs.get(ref) or f"变种 {ref}"
-                    lines = _extract_infobox_lines(content)
-                    if lines:
-                        sections.append(
-                            WikiSection(
-                                heading_path=("信息框", variant),
-                                content="\n".join(lines),
-                                section_type="infobox",
-                            )
-                        )
-            else:
-                lines = _extract_infobox_lines(box)
-                if lines:
-                    sections.append(
-                        WikiSection(
-                            heading_path=("信息框",),
-                            content="\n".join(lines),
-                            section_type="infobox",
+                    sections.extend(
+                        _extract_portable_infobox_sections(
+                            content,
+                            ("信息框", variant),
                         )
                     )
+            else:
+                sections.extend(
+                    _extract_portable_infobox_sections(
+                        box,
+                        ("信息框",),
+                    )
+                )
         box.decompose()
 
     for table in list(root.select("table.infobox")):

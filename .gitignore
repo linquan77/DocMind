@@ -6,6 +6,8 @@ __pycache__/
 docs/*
 !docs/version_updates.md
 !docs/database-schema.md
+!docs/development-log.md
+!docs/wiki-data-pipeline.md
 /models/
 docmind.db
 docmind.db-*

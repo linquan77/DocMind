@@ -120,6 +120,62 @@ def test_parse_tabbed_critter_infobox_without_hardcoded_fields(tmp_path):
     assert page.sections[-1].heading_path == ("养殖方式", "煤炭产出")
 
 
+def test_infobox_group_title_is_repeated_in_every_split_chunk(tmp_path):
+    path = write_snapshot(
+        tmp_path,
+        """
+        <div class="mw-parser-output">
+          <aside class="portable-infobox pi-theme-critter">
+            <ul class="pi-section-navigation">
+              <li class="pi-section-tab" data-ref="0">好吃哈奇</li>
+            </ul>
+            <div class="pi-section-content" data-ref="0">
+              <div class="pi-data">
+                <h3 class="pi-data-label">ID</h3>
+                <div class="pi-data-value">Hatch</div>
+              </div>
+              <section class="pi-item pi-group pi-collapse pi-collapse-open">
+                <h2 class="pi-item pi-header">食谱</h2>
+                <div class="pi-item pi-data" data-source="代谢">
+                  <div class="pi-data-value">
+                    沙子 140 千克 ➤ 煤炭 70 千克\n
+                    泥土 140 千克 ➤ 煤炭 70 千克\n
+                    藻类 140 千克 ➤ 煤炭 140 千克
+                  </div>
+                </div>
+              </section>
+            </div>
+          </aside>
+        </div>
+        """,
+        title="好吃哈奇",
+    )
+
+    page = parse_wiki_snapshot(path)
+
+    assert [section.heading_path for section in page.sections] == [
+        ("信息框", "好吃哈奇"),
+        ("信息框", "好吃哈奇", "食谱"),
+    ]
+    assert page.sections[0].content == "ID：Hatch"
+    recipe_section = page.sections[1]
+    assert "沙子 140 千克 ➤ 煤炭 70 千克" in recipe_section.content
+
+    chunks = split_wiki_page(
+        page,
+        chunk_size=45,
+        chunk_overlap=5,
+    )
+    recipe_chunks = [
+        chunk for chunk in chunks if chunk.metadata["section"] == "食谱"
+    ]
+    assert len(recipe_chunks) > 1
+    assert all(
+        "章节：信息框 / 好吃哈奇 / 食谱" in chunk.page_content
+        for chunk in recipe_chunks
+    )
+
+
 def test_parse_classic_table_infobox(tmp_path):
     path = write_snapshot(
         tmp_path,

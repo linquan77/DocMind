@@ -48,6 +48,13 @@ data/raw/wiki/    # Wiki 原始快照，本地生成且不提交 Git
 chroma_db/        # Chroma 本地数据，不提交 Git
 ```
 
+## 项目文档
+
+- [开发日志](docs/development-log.md)：按日期记录重要改动、修改原因、验证结果和后续事项。
+- [Wiki 数据处理技术文档](docs/wiki-data-pipeline.md)：说明 Wiki 同步、快照、HTML 解析、切块、索引和质量检查的工作原理。
+- [数据库结构说明](docs/database-schema.md)：说明 SQLite 表结构、状态字段以及与 Chroma metadata 的关联。
+- [第一阶段版本更新](docs/version_updates.md)：保留早期高质量 RAG 能力的完整改造记录。
+
 ## 技术栈
 
 - FastAPI、Pydantic、Uvicorn
@@ -279,6 +286,29 @@ wiki:{page_id}:{revision_id}:{chunk_index}
 ```
 
 页面出现新修订时，索引流程会先写入并校验新版本，成功后再删除旧版本。失败时保留旧 `indexed_revision_id` 并将文档标记为 `index_failed`；重复执行已经是最新版本的页面会直接跳过。
+
+### 5. 随机抽查切块
+
+从全部 Chroma collection 随机抽取 5 个切块，在控制台输出完整正文和 metadata：
+
+```bash
+python -m app.commands.sample_chunks
+```
+
+指定抽样数量和随机种子：
+
+```bash
+python -m app.commands.sample_chunks --count 10 --seed 42
+```
+
+随机种子可以复现同一批样本，方便修复解析或切块逻辑后进行前后对比。还可以只检查指定页面或 collection：
+
+```bash
+python -m app.commands.sample_chunks --title "电解器"
+python -m app.commands.sample_chunks --collection langchain
+```
+
+该命令只读取切块 ID、正文和 metadata，不加载向量或 Embedding 模型，也不会修改 Chroma。
 
 ## 数据存储职责
 
